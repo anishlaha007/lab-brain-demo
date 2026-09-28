@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab Brain · prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Instrument+Serif&display=swap">
+<style>
+:root{--bg:#121215;--panel:#17171B;--card:#1E1E24;--line:#2A2A31;--line2:#34343D;--text:#ECE8E1;--muted:#A9A49B;--dim:#8E8A82;--amber:#E6B45A;--teal:#5FB3A8}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',system-ui,sans-serif;overflow:hidden}
+button{font-family:inherit;cursor:pointer;color:inherit}
+button:disabled{cursor:not-allowed}
+button:focus-visible,input:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+input::placeholder{color:var(--dim)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ghost:hover{background:#2A2A31!important}
+.scroll::-webkit-scrollbar{width:8px}.scroll::-webkit-scrollbar-thumb{background:#2E2E36;border-radius:4px}
+.mono{font-family:'IBM Plex Mono',monospace}
+.serif{font-family:'Instrument Serif',Georgia,serif;font-weight:400}
+.h2{margin:0;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.av{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;color:#141417;font-weight:600;flex-shrink:0}
+.aimark{width:26px;height:26px;flex-shrink:0;border-radius:13px;background:#16302C;border:1px solid var(--teal);display:inline-flex;align-items:center;justify-content:center}
+.aimark i{width:8px;height:8px;border-radius:4px;background:var(--teal);display:block}
+.btn{height:34px;padding:0 12px;border-radius:8px;font-size:12.5px;white-space:nowrap;flex-shrink:0}
+#stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+#app{width:1440px;height:900px;transform-origin:center center;flex-shrink:0}
+.node{position:absolute;width:184px;background:var(--card);border:1px solid var(--line2);border-radius:12px;display:flex;flex-direction:column;transition:box-shadow .15s}
+.node>button.sel{width:100%;text-align:left;background:transparent;border:none;border-radius:12px 12px 0 0;padding:12px 12px 8px;display:flex;flex-direction:column;gap:8px}
+.chip{padding:3px 8px;border-radius:6px;background:var(--card);border:1px solid var(--line2);color:#CFCAC1;font-size:11.5px}
+.fadein{animation:f .25s ease}
+@keyframes f{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div id="stage"><div id="app"></div></div>
+<script>
+(function(){
+const P={
+  maya:{name:'Maya Chen',role:'PhD',initials:'MC',color:'#E89A7A'},
+  dev:{name:'Dev Raman',role:'PhD',initials:'DR',color:'#7FB0E8'},
+  okafor:{name:'Prof. Okafor',role:'PI',initials:'NO',color:'#C79BE0'},
+  sam:{name:'Sam Lee',role:'MS',initials:'SL',color:'#9CCB8C'},
+  you:{name:'You',role:'',initials:'YO',color:'#D8D2C6'},
+  ai:{name:'Lab AI',role:'',initials:'AI',color:'#5FB3A8'}
+};
+const KIND={chat:{label:'CHAT',color:'#B8B3AA'},branch:{label:'BRANCH',color:'#E6B45A'},merge:{label:'MERGE',color:'#5FB3A8'}};
+const GOALS=[
+  {id:'G1',text:'Match CFD drag to tunnel data across Re 60k to 120k',meta:'3 linked chats'},
+  {id:'G2',text:'Pick a skin stiffness for the next tunnel slot',meta:'2 linked chats'},
+  {id:'G3',text:'Draft the conference abstract',meta:'No chats yet'}
+];
+const S={
+  selected:'n5',tray:['n4'],draft:'',showMd:false,aiTyping:false,suggestion:true,counter:7,
+  activity:[
+    {who:'dev',text:'is prompting in',target:'CFD vs tunnel mismatch',quote:'Plot drag error against Re for sessions 4 and 7'},
+    {who:'ai',text:'linked a finding to',target:'Goal 1',quote:''},
+    {who:'sam',text:'branched',target:'Why does run 3 separate early?',quote:''},
+    {who:'okafor',text:'merged 2 chats into',target:'Skin stiffness for next test plan',quote:''}
+  ],
+  nodes:[
+    {id:'n1',kind:'chat',author:'maya',title:'Baseline wing CFD runs',x:28,y:84,parents:[],viewers:[],file:'baseline-wing-cfd-runs.md',messages:[
+      {who:'maya',text:'Summarise the three baseline runs in /sim/baseline and flag anything that looks off against our drag target.'},
+      {who:'ai',text:'Runs 1 and 2 converge cleanly. Run 3 shows separation starting near 40% chord at Re 80k, earlier than the other two, which puts it furthest from Goal 1.',sources:['sim/baseline/run3_log.csv','notes/2026-09-12.md']},
+      {who:'maya',text:'Pull the pressure plots for run 3 next to run 1.'},
+      {who:'ai',text:'Both plots are attached. The suction peak on run 3 collapses about 0.1c further forward.',sources:['sim/baseline/plots/run1_cp.png','sim/baseline/plots/run3_cp.png']}]},
+    {id:'n2',kind:'chat',author:'dev',title:'Wind tunnel data cleanup',x:28,y:316,parents:[],viewers:[],file:'wind-tunnel-data-cleanup.md',messages:[
+      {who:'dev',text:'Which September tunnel sessions are missing pressure tap calibration?'},
+      {who:'ai',text:'Sessions 4 and 7. Both used the old tap map from before the rewiring note on 3 Sep.',sources:['lab-notes/okafor-2026-09-03.md']},
+      {who:'dev',text:'Re-normalise 4 and 7 with the new map and save them as a new version.'},
+      {who:'ai',text:'Saved as new versions. The originals are untouched.',sources:['tunnel/sept/session4_v2.csv','tunnel/sept/session7_v2.csv']}]},
+    {id:'n3',kind:'chat',author:'okafor',title:'Lit review: morphing skins',x:28,y:548,parents:[],viewers:['okafor'],file:'lit-review-morphing-skins.md',messages:[
+      {who:'okafor',text:'Find papers in our shared library that test elastomer skins below Re 100k.'},
+      {who:'ai',text:'Six papers in the library match. Two report stiffness data we can compare against directly. Page references are in the .md file.',sources:['library/skins/']}]},
+    {id:'n4',kind:'branch',author:'sam',title:'Why does run 3 separate early?',x:268,y:108,parents:['n1'],viewers:['sam'],file:'why-run3-separates-early.md',messages:[
+      {who:'ai',text:'Branched from "Baseline wing CFD runs". I have Maya’s 4 messages and the run 3 plots as context. Her chat stays as it is.'},
+      {who:'sam',text:'Is it the mesh or the physics? Compare run 3’s mesh settings against runs 1 and 2.'},
+      {who:'ai',text:'The first cell height near the leading edge is roughly twice as large in run 3. That alone could move separation forward. Worth rerunning before reading anything into it.',sources:['sim/baseline/run3_mesh.cfg','sim/baseline/run1_mesh.cfg']}]},
+    {id:'n5',kind:'merge',author:'maya',title:'CFD vs tunnel mismatch',x:268,y:340,parents:['n1','n2'],viewers:['maya','dev'],typing:'dev',file:'cfd-vs-tunnel-mismatch.md',messages:[
+      {who:'ai',text:'Merged "Baseline wing CFD runs" and "Wind tunnel data cleanup". 8 messages and their linked files are in context.'},
+      {who:'maya',text:'Now that sessions 4 and 7 are re-normalised, how far off is CFD from the tunnel?'},
+      {who:'ai',text:'Lift lines up across the sweep. Drag does not. CFD under-predicts it most around Re 80k, the same place run 3 separates early. Sam is looking at that in his branch.',sources:['tunnel/sept/session4_v2.csv','sim/baseline/run3_log.csv']}]},
+    {id:'n6',kind:'merge',author:'okafor',title:'Skin stiffness for next test plan',x:508,y:480,parents:['n3','n5'],viewers:[],file:'skin-stiffness-next-test-plan.md',messages:[
+      {who:'ai',text:'Merged "Lit review: morphing skins" and "CFD vs tunnel mismatch".'},
+      {who:'okafor',text:'Given the mismatch, which skin stiffness should we test first in the next tunnel slot?'},
+      {who:'ai',text:'Both papers with stiffness data point to the softer skin for delaying separation at low Re, so I’d test that first. Sam’s mesh question should be settled before the CFD numbers are used for comparison. Your call.',sources:['library/skins/','goals.md']}]}
+  ]
+};
+
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const byId=id=>S.nodes.find(n=>n.id===id);
+const slug=t=>t.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)+'.md';
+const av=(k,size,fs,extra)=>`<span class="av" title="${esc(P[k].name)}" style="width:${size}px;height:${size}px;font-size:${fs}px;background:${P[k].color};${extra||''}">${P[k].initials}</span>`;
+
+function nextSlot(){
+  const slots=[{x:508,y:84},{x:508,y:276},{x:268,y:572},{x:508,y:660}];
+  for(const s of slots){ if(!S.nodes.some(n=>Math.abs(n.x-s.x)<180&&Math.abs(n.y-s.y)<140)) return s; }
+  const k=S.nodes.length; return {x:268+(k%3)*40,y:130+(k%6)*70};
+}
+function addNode(node,act){
+  S.nodes.push(node); S.selected=node.id; S.counter++; S.showMd=false; S.tray=[];
+  S.activity=[act,...S.activity].slice(0,5); render();
+}
+function doBranch(){
+  const p=byId(S.selected); if(!p) return; const pos=nextSlot(); const title='Branch of '+p.title;
+  addNode({id:'n'+S.counter,kind:'branch',author:'you',title,x:pos.x,y:pos.y,parents:[p.id],viewers:['you'],file:slug(title),
+    messages:[{who:'ai',text:'Branched from "'+p.title+'". I have its '+p.messages.length+' messages and linked files as context. The original chat stays as it is. What do you want to push on?'}]},
+    {who:'you',text:'branched',target:p.title,quote:''});
+}
+function mergeIds(){ const ids=S.tray.slice(); if(ids.length<2&&ids.indexOf(S.selected)<0) ids.unshift(S.selected); return ids; }
+function doMerge(ids,custom){
+  const src=ids.map(byId).filter(Boolean); if(src.length<2) return;
+  const short=t=>t.split(' ').slice(0,3).join(' ');
+  const title=custom||('Merge: '+src.map(n=>short(n.title)).join(' + '));
+  const total=src.reduce((a,n)=>a+n.messages.length,0); const pos=nextSlot();
+  addNode({id:'n'+S.counter,kind:'merge',author:'you',title,x:pos.x,y:pos.y,parents:src.map(n=>n.id),viewers:['you'],file:slug(title),
+    messages:[{who:'ai',text:'Merged '+src.map(n=>'"'+n.title+'"').join(' and ')+'. '+total+' messages and their linked files are now one context. The source chats are untouched.',sources:src.map(n=>'chats/'+n.file)}]},
+    {who:'you',text:'merged '+src.length+' chats into',target:title,quote:''});
+}
+function newChat(){
+  const pos=nextSlot(); const title='New chat '+S.counter;
+  addNode({id:'n'+S.counter,kind:'chat',author:'you',title,x:pos.x,y:pos.y,parents:[],viewers:['you'],file:slug(title),
+    messages:[{who:'ai',text:'New chat. I know the lab goals and can see every chat on the map. Pull any of them in as context, or just ask.'}]},
+    {who:'you',text:'started',target:title,quote:''});
+}
+let timer;
+function doSend(){
+  const text=(S.draft||'').trim(); if(!text) return;
+  const id=S.selected; const node=byId(id);
+  const ctx=S.tray.filter(t=>t!==id).map(byId).filter(Boolean);
+  node.messages.push({who:'you',text}); if(node.viewers.indexOf('you')<0) node.viewers.push('you');
+  S.draft=''; S.aiTyping=true; S.showMd=false;
+  S.activity=[{who:'you',text:'is prompting in',target:node.title,quote:text.length>60?text.slice(0,60)+'…':text},...S.activity].slice(0,5);
+  render(true);
+  clearTimeout(timer);
+  timer=setTimeout(()=>{
+    const lead=ctx.length?'Reading this chat together with '+ctx.map(n=>'"'+n.title+'"').join(' and ')+', plus the lab goals. ':'Reading this chat and the lab goals. ';
+    node.messages.push({who:'ai',text:lead+'In the full app the answer lands here with citations to the exact files in the brain, and anything relevant to a goal gets flagged for the team.',sources:['goals.md'].concat(ctx.map(n=>'chats/'+n.file))});
+    S.aiTyping=false; render(true);
+  },1100);
+}
+
+function render(focusInput){
+  const map={}; S.nodes.forEach(n=>map[n.id]=n);
+  const sn=map[S.selected]||S.nodes[0]; const sk=KIND[sn.kind]; const sa=P[sn.author];
+  const inTraySel=S.tray.indexOf(sn.id)>-1;
+  const mIds=mergeIds(); const canMerge=mIds.length>=2;
+  const nb=S.nodes.filter(n=>n.kind==='branch').length, nm=S.nodes.filter(n=>n.kind==='merge').length;
+
+  let bp='',mp='';
+  S.nodes.forEach(n=>n.parents.forEach(pid=>{const p=map[pid]; if(!p) return;
+    const x1=p.x+184,y1=p.y+58,x2=n.x,y2=n.y+58,dx=Math.max(40,(x2-x1)/2);
+    const d=`M${x1} ${y1} C${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2} `; if(n.kind==='merge') mp+=d; else bp+=d;}));
+
+  const nodesHtml=S.nodes.map(n=>{
+    const k=KIND[n.kind], isSel=n.id===S.selected, inTray=S.tray.indexOf(n.id)>-1;
+    const prompts=n.messages.filter(m=>m.who!=='ai').length;
+    const ring=isSel?'0 0 0 2px #ECE8E1, 0 14px 34px rgba(0,0,0,.5)':(inTray?'0 0 0 2px #5FB3A8, 0 6px 18px rgba(0,0,0,.35)':'0 6px 18px rgba(0,0,0,.35)');
+    return `<div class="node" style="left:${n.x}px;top:${n.y}px;box-shadow:${ring}">
+      <button class="sel" data-pick="${n.id}">
+        <span style="display:flex;align-items:center;justify-content:space-between;width:100%">
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:10.5px;letter-spacing:.08em;font-weight:600;color:${k.color}"><span style="width:6px;height:6px;border-radius:3px;background:${k.color}"></span>${k.label}</span>
+          <span style="display:inline-flex">${n.viewers.map(v=>av(v,18,7.5,'margin-left:-4px;border:1.5px solid #1E1E24')).join('')}</span>
+        </span>
+        <span class="clamp2" style="font-size:13.5px;font-weight:600;line-height:1.35">${esc(n.title)}</span>
+        <span style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted)">${av(n.author,18,7.5)}${esc(P[n.author].name)} · ${prompts} ${prompts===1?'prompt':'prompts'}</span>
+      </button>
+      <div style="padding:0 12px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span class="mono" style="font-size:10.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">${esc(n.file)}</span>
+        <button data-toggle="${n.id}" style="flex-shrink:0;font-size:11px;font-weight:500;padding:4px 8px;border-radius:6px;border:1px solid ${inTray?'#5FB3A8':'#3E3E48'};background:${inTray?'#5FB3A8':'transparent'};color:${inTray?'#10201E':'#CFCAC1'}">${inTray?'In context':'+ Context'}</button>
+      </div></div>`;}).join('');
+
+  const md=(()=>{const L=['# '+sn.title,'','type: '+sn.kind,'started by: '+sa.name];
+    if(sn.parents.length) L.push('built on: '+sn.parents.map(id=>'[['+(map[id]?map[id].title:id)+']]').join(', '));
+    L.push('goals: [[goals]]','','---','');
+    sn.messages.forEach(m=>{L.push('**'+P[m.who].name+':** '+m.text); if(m.sources&&m.sources.length) L.push('sources: '+m.sources.map(x=>'[['+x+']]').join(', ')); L.push('');});
+    return L.join('\n');})();
+
+  const msgsHtml=sn.messages.map(m=>{
+    if(m.who==='ai') return `<div style="display:flex;gap:10px" class="fadein"><span class="aimark"><i></i></span>
+      <div style="flex-grow:1;min-width:0;padding:10px 12px;border-radius:10px;background:#1B2422;border:1px solid #263835;display:flex;flex-direction:column;gap:8px">
+        <span style="font-size:12px;font-weight:600;color:#8FD3C8">Lab AI</span>
+        <span style="font-size:13px;line-height:1.55;color:#E3EEEB">${esc(m.text)}</span>
+        ${m.sources&&m.sources.length?`<div style="display:flex;flex-wrap:wrap;gap:6px">${m.sources.map(s=>`<span class="mono" style="font-size:10.5px;padding:3px 7px;border-radius:5px;background:#13201E;border:1px solid #2F4A46;color:#A8D8D0">${esc(s)}</span>`).join('')}</div>`:''}
+      </div></div>`;
+    const p=P[m.who];
+    return `<div style="display:flex;gap:10px" class="fadein">${av(m.who,26,9.5)}
+      <div style="display:flex;flex-direction:column;gap:4px;min-width:0">
+        <span style="font-size:12px;color:var(--muted)"><strong style="color:var(--text);font-weight:600">${esc(p.name)}</strong> ${esc(p.role)}</span>
+        <span style="font-size:13px;line-height:1.55">${esc(m.text)}</span></div></div>`;}).join('');
+
+  const trayHtml=S.tray.filter(id=>id!==S.selected).map(byId).filter(Boolean).map(n=>
+    `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 4px 2px 8px;border-radius:6px;background:#16302C;border:1px solid #2F4A46;color:#A8D8D0;font-size:11.5px">${esc(n.title)}<button data-untray="${n.id}" aria-label="Remove ${esc(n.title)} from context" style="width:18px;height:18px;padding:0;border:none;background:transparent;color:#A8D8D0;font-size:13px;line-height:1">×</button></span>`).join('');
+
+  document.getElementById('app').innerHTML=`
+<div style="width:1440px;height:900px;display:flex;flex-direction:column;background:var(--bg);overflow:hidden">
+<header style="height:56px;flex-shrink:0;padding:0 20px;display:flex;align-items:center;gap:20px;background:var(--panel);border-bottom:1px solid var(--line)">
+  <div style="display:flex;align-items:center;gap:10px;width:232px">
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#E6B45A" stroke-width="1.6" aria-hidden="true"><circle cx="5" cy="6" r="2.5"/><circle cx="17" cy="5" r="2.5"/><circle cx="11" cy="17" r="2.5"/><path d="M7.3 7.2 9.6 15M15.6 7.1 12.3 15M7.5 6h7"/></svg>
+    <span class="serif" style="font-size:24px;line-height:1">Lab Brain</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px"><span style="color:var(--text);font-weight:500">Morphing Wing Lab</span><span>/</span><span>Lab map</span></div>
+  <div style="flex-grow:1;display:flex;justify-content:center">
+    <label for="search" class="sr">Search the lab brain</label>
+    <input id="search" type="search" placeholder="Search every chat, file and note in the brain" style="width:380px;height:36px;padding:0 14px;border-radius:8px;border:1px solid #2E2E36;background:var(--card);color:var(--text);font-family:inherit;font-size:13px">
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <div style="display:flex;align-items:center">${['maya','dev','okafor','sam'].map(k=>av(k,28,10.5,'margin-left:-6px;border:2px solid #17171B')).join('')}</div>
+    <span style="font-size:12.5px;color:var(--muted)">4 researchers online</span>
+    <span style="display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border-radius:999px;background:#16302C;color:#8FD3C8;font-size:12px;font-weight:500"><span style="width:7px;height:7px;border-radius:4px;background:var(--teal)"></span>Lab AI active</span>
+  </div>
+</header>
+<div style="flex-grow:1;display:flex;min-height:0">
+<aside class="scroll" style="width:272px;flex-shrink:0;padding:20px 18px;display:flex;flex-direction:column;gap:26px;background:var(--panel);border-right:1px solid var(--line);overflow-y:auto">
+  <section style="display:flex;flex-direction:column;gap:10px">
+    <h2 class="h2">Research goals</h2>
+    ${GOALS.map(g=>`<div style="padding:10px 12px;border-radius:10px;background:var(--card);border:1px solid var(--line);display:flex;flex-direction:column;gap:5px">
+      <div style="display:flex;gap:8px;align-items:baseline"><span class="mono" style="font-size:11px;color:var(--amber);font-weight:500">${g.id}</span><span style="font-size:12.5px;line-height:1.4">${g.text}</span></div>
+      <span style="font-size:11px;color:var(--muted);padding-left:24px">${g.meta}</span></div>`).join('')}
+    <p style="margin:0;font-size:11.5px;line-height:1.5;color:var(--muted)">The Lab AI reads these before every answer. It suggests. Researchers decide.</p>
+  </section>
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2 class="h2">Live in the lab</h2>
+    ${S.activity.map(a=>`<div style="display:flex;gap:10px;align-items:flex-start" class="fadein">${av(a.who,22,9)}
+      <div style="display:flex;flex-direction:column;gap:5px;min-width:0">
+        <span style="font-size:12.5px;line-height:1.45;color:#CFCAC1"><strong style="color:var(--text);font-weight:600">${esc(P[a.who].name)}</strong> ${esc(a.text)} <span style="color:var(--amber)">${esc(a.target)}</span></span>
+        ${a.quote?`<span class="mono" style="font-size:11px;line-height:1.45;color:var(--muted);padding:6px 8px;border-radius:6px;background:var(--card);border:1px solid var(--line)">&gt; ${esc(a.quote)}</span>`:''}
+      </div></div>`).join('')}
+  </section>
+  <section style="display:flex;flex-direction:column;gap:6px">
+    <h2 class="h2" style="margin-bottom:4px">Brain vault</h2>
+    <span class="mono" style="font-size:12px;color:#CFCAC1">brain/</span>
+    <span class="mono" style="font-size:12px;color:var(--muted);padding-left:14px">goals.md</span>
+    <span class="mono" style="font-size:12px;color:#CFCAC1;padding-left:14px">chats/</span>
+    ${S.nodes.map(n=>`<button data-pick="${n.id}" class="ghost mono" style="text-align:left;background:${n.id===S.selected?'#26262D':'transparent'};border:none;border-radius:6px;padding:5px 8px 5px 28px;font-size:11.5px;color:${n.id===S.selected?'#ECE8E1':'#A9A49B'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(n.file)}</button>`).join('')}
+    <span class="mono" style="font-size:12px;color:var(--muted);padding-left:14px">files/</span>
+    <span style="font-size:11px;color:var(--dim);padding-left:28px">synced from Drive, Box and the lab server</span>
+  </section>
+</aside>
+<main style="position:relative;flex-grow:1;min-width:0;overflow:hidden;background-color:#131316;background-image:radial-gradient(#2A2A31 1px,transparent 1px);background-size:22px 22px">
+  <svg width="720" height="844" viewBox="0 0 720 844" style="position:absolute;left:0;top:0" aria-hidden="true">
+    <path d="${bp||'M0 0'}" fill="none" stroke="#E6B45A" stroke-width="1.6" stroke-opacity=".8"/>
+    <path d="${mp||'M0 0'}" fill="none" stroke="#5FB3A8" stroke-width="1.6" stroke-dasharray="5 5"/>
+  </svg>
+  <div style="position:absolute;left:20px;right:20px;top:16px;display:flex;align-items:center;gap:8px;z-index:2">
+    <div style="display:flex;flex-direction:column;gap:2px;flex-grow:1;min-width:0;white-space:nowrap">
+      <span class="serif" style="font-size:22px;line-height:1">Lab map</span>
+      <span style="font-size:11.5px;color:var(--muted)">${S.nodes.length} chats · ${nb} ${nb===1?'branch':'branches'} · ${nm} merges · open to the whole lab</span>
+    </div>
+    <button data-act="new" class="ghost btn" style="border:1px solid #3E3E48;background:var(--card)">New chat</button>
+    <button data-act="branch" class="ghost btn" style="border:1px solid #6B5530;background:var(--card);color:#F0C878">Branch selected</button>
+    <button data-act="merge" ${canMerge?'':'disabled'} class="btn" style="border:1px solid var(--teal);background:var(--teal);color:#10201E;font-weight:600;opacity:${canMerge?1:.45}">${canMerge?'Merge '+mIds.length+' chats':'Merge chats'}</button>
+  </div>
+  ${nodesHtml}
+  ${S.suggestion?`<div style="position:absolute;left:20px;bottom:20px;width:440px;padding:14px 16px;border-radius:12px;background:#172624;border:1px solid #2F4A46;box-shadow:0 10px 30px rgba(0,0,0,.4);display:flex;gap:12px;z-index:3">
+    <span class="aimark" style="width:24px;height:24px"><i></i></span>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <span style="font-size:12.5px;line-height:1.5;color:#D7E9E5"><strong style="font-weight:600">Lab AI noticed a link.</strong> Sam's mesh finding in "Why does run 3 separate early?" may explain the drag gap Maya is chasing. Merge them into one chat?</span>
+      <div style="display:flex;gap:8px">
+        <button data-act="accept" style="height:30px;padding:0 12px;border-radius:7px;border:none;background:var(--teal);color:#10201E;font-size:12px;font-weight:600">Merge these</button>
+        <button data-act="dismiss" class="ghost" style="height:30px;padding:0 12px;border-radius:7px;border:1px solid #2F4A46;background:transparent;color:#CFE3DF;font-size:12px">Not now</button>
+      </div></div></div>`:''}
+  <div style="position:absolute;right:20px;bottom:22px;display:flex;gap:16px;font-size:11.5px;color:var(--muted)">
+    <span style="display:inline-flex;align-items:center;gap:6px"><svg width="22" height="6" aria-hidden="true"><path d="M0 3h22" stroke="#E6B45A" stroke-width="1.6"/></svg>Branch</span>
+    <span style="display:inline-flex;align-items:center;gap:6px"><svg width="22" height="6" aria-hidden="true"><path d="M0 3h22" stroke="#5FB3A8" stroke-width="1.6" stroke-dasharray="4 3"/></svg>Merge</span>
+  </div>
+</main>
+<aside style="width:448px;flex-shrink:0;display:flex;flex-direction:column;background:var(--panel);border-left:1px solid var(--line);min-height:0">
+  <div style="padding:18px 20px 14px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--line)">
+    <span style="display:inline-flex;align-items:center;gap:6px;font-size:10.5px;letter-spacing:.08em;font-weight:600;color:${sk.color}"><span style="width:6px;height:6px;border-radius:3px;background:${sk.color}"></span>${sk.label}</span>
+    <h1 class="serif" style="margin:0;font-size:28px;line-height:1.12">${esc(sn.title)}</h1>
+    <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)">${av(sn.author,20,8)}<span>Started by ${esc(sa.name)}</span><span>·</span><span class="mono" style="font-size:11px">brain/chats/${esc(sn.file)}</span></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
+      <button data-act="branch" class="ghost" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #6B5530;background:transparent;color:#F0C878;font-size:12.5px">Branch from this chat</button>
+      <button data-toggle="${sn.id}" class="ghost" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #3E3E48;background:transparent;color:#CFCAC1;font-size:12.5px">${inTraySel?'Remove from context':'Use as context'}</button>
+      <div style="flex-grow:1"></div>
+      <div style="display:flex;padding:3px;border-radius:8px;background:var(--card);border:1px solid var(--line)">
+        <button data-act="chat" style="height:26px;padding:0 10px;border-radius:6px;border:none;background:${S.showMd?'transparent':'#33333C'};color:${S.showMd?'#A9A49B':'#ECE8E1'};font-size:12px">Chat</button>
+        <button data-act="md" class="mono" style="height:26px;padding:0 10px;border-radius:6px;border:none;background:${S.showMd?'#33333C':'transparent'};color:${S.showMd?'#ECE8E1':'#A9A49B'};font-size:12px">.md</button>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11.5px;color:var(--muted)">
+      <span>${sn.parents.length?'Built on':'Original chat. Not built on another chat.'}</span>
+      ${sn.parents.map(byId).filter(Boolean).map(p=>`<button data-pick="${p.id}" class="ghost chip" style="color:var(--text)">${esc(p.title)}</button>`).join('')}
+    </div>
+  </div>
+  ${S.showMd
+    ?`<div class="scroll" style="flex-grow:1;min-height:0;overflow-y:auto;padding:16px 20px"><pre class="mono" style="margin:0;font-size:11.5px;line-height:1.6;color:#CFCAC1;white-space:pre-wrap">${esc(md)}</pre></div>`
+    :`<div id="msgs" class="scroll" style="flex-grow:1;min-height:0;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:16px">${msgsHtml}
+      ${sn.typing?`<span style="font-size:12px;color:var(--muted);font-style:italic">${esc(P[sn.typing].name)} is typing in this chat…</span>`:''}
+      ${S.aiTyping?`<span style="font-size:12px;color:#8FD3C8;font-style:italic">Lab AI is reading the linked chats…</span>`:''}</div>`}
+  <div style="padding:12px 20px 16px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11.5px;color:var(--muted)">
+      <span>Context for next prompt:</span><span class="chip">This chat</span><span class="chip">Lab goals</span>${trayHtml}
+    </div>
+    <div style="display:flex;gap:8px">
+      <label for="prompt" class="sr">Prompt the Lab AI</label>
+      <input id="prompt" value="${esc(S.draft)}" placeholder="Ask the Lab AI. Everyone in the lab can see this chat." autocomplete="off" style="flex-grow:1;height:42px;padding:0 14px;border-radius:10px;border:1px solid var(--line2);background:var(--card);color:var(--text);font-family:inherit;font-size:13px">
+      <button data-act="send" style="height:42px;padding:0 16px;border-radius:10px;border:none;background:var(--amber);color:#1A1408;font-size:13px;font-weight:600">Send</button>
+    </div>
+    <span style="font-size:11px;color:var(--dim)">Saved to brain/chats/${esc(sn.file)} as you go</span>
+  </div>
+</aside>
+</div></div>`;
+  const msgs=document.getElementById('msgs'); if(msgs) msgs.scrollTop=msgs.scrollHeight;
+  if(focusInput){ const i=document.getElementById('prompt'); if(i) i.focus(); }
+}
+
+const app=document.getElementById('app');
+app.addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  if(b.dataset.pick){ S.selected=b.dataset.pick; S.showMd=false; return render(); }
+  if(b.dataset.toggle){ const id=b.dataset.toggle; S.tray=S.tray.indexOf(id)>-1?S.tray.filter(x=>x!==id):[...S.tray,id]; return render(); }
+  if(b.dataset.untray){ S.tray=S.tray.filter(x=>x!==b.dataset.untray); return render(); }
+  switch(b.dataset.act){
+    case 'new': return newChat();
+    case 'branch': return doBranch();
+    case 'merge': { const ids=mergeIds(); if(ids.length>=2) doMerge(ids); return; }
+    case 'accept': S.suggestion=false; return doMerge(['n4','n5'],'Mesh check vs drag gap');
+    case 'dismiss': S.suggestion=false; return render();
+    case 'chat': S.showMd=false; return render();
+    case 'md': S.showMd=true; return render();
+    case 'send': return doSend();
+  }
+});
+app.addEventListener('input',e=>{ if(e.target.id==='prompt') S.draft=e.target.value; });
+app.addEventListener('keydown',e=>{ if(e.target.id==='prompt'&&e.key==='Enter') doSend(); });
+
+function fit(){ const s=Math.min(window.innerWidth/1440,window.innerHeight/900); app.style.transform='scale('+s+')'; }
+window.addEventListener('resize',fit);
+render(); fit();
+})();
+</script>
+</body>
+</html>
